@@ -177,12 +177,24 @@ class CreatorHooksScraper {
       }
     });
 
-    while (hasMorePages && currentPage <= 1) {
-      // Limit to 1 page for testing
+    while (hasMorePages) {
       const { postUrls, hasNextPage } =
         await this.scrapeListingPage(currentPage);
+
+      if (postUrls.length === 0) {
+        console.log(`No posts found on page ${currentPage}. Stopping.`);
+        break;
+      }
+
       allPostUrls.push(...postUrls);
       hasMorePages = hasNextPage;
+
+      if (!hasMorePages) {
+        console.log(
+          `No next page detected after page ${currentPage}. Stopping.`,
+        );
+      }
+
       currentPage++;
 
       // Be respectful with rate limiting
