@@ -4,7 +4,7 @@ const { google } = require("googleapis");
 const fs = require("fs").promises;
 
 // Google Sheets configuration
-const SPREADSHEET_ID = "152UP8OkJVqC6Pq6DUCcMoYidUM5AETF4Ycfqk7uyrjc"; // Replace with your Google Sheet ID
+const SPREADSHEET_ID = "1hdzFosH2FlouVSEcNa8skjjsAGGPQtwtyVfgYZMSjMg"; // Replace with your Google Sheet ID
 const CREDENTIALS_PATH = "./credentials.json";
 
 class CreatorHooksScraperLight {
@@ -83,6 +83,7 @@ class CreatorHooksScraperLight {
         let hookScore = "";
         let whyThisWorks = "";
         let collectingWhy = false;
+        let extractedTitle = "";
 
         // Get all siblings until next heading
         let $next = $heading.next();
@@ -92,7 +93,7 @@ class CreatorHooksScraperLight {
 
           // Extract Title
           if (text.startsWith("Title:")) {
-            framework = text.replace("Title:", "").trim();
+            extractedTitle = text.replace("Title:", "").trim();
           }
 
           // Extract Framework
@@ -131,7 +132,7 @@ class CreatorHooksScraperLight {
 
         if (framework || hookScore) {
           hooks.push({
-            sectionTitle: sectionTitle,
+            title: extractedTitle || sectionTitle,
             framework: framework,
             hookScore: hookScore,
             whyThisWorks: whyThisWorks.trim(),
@@ -182,12 +183,48 @@ class CreatorHooksScraperLight {
     return this.allHooks;
   }
 
+  async ensureSheetExists(sheets, title) {
+    try {
+      const response = await sheets.spreadsheets.get({
+        spreadsheetId: SPREADSHEET_ID,
+      });
+
+      const sheetExists = response.data.sheets.some(
+        (sheet) => sheet.properties.title === title,
+      );
+
+      if (!sheetExists) {
+        console.log(`Sheet '${title}' does not exist. Creating it...`);
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [
+              {
+                addSheet: {
+                  properties: {
+                    title: title,
+                  },
+                },
+              },
+            ],
+          },
+        });
+        console.log(`Sheet '${title}' created successfully.`);
+      }
+    } catch (error) {
+      console.error("Error checking/creating sheet:", error.message);
+      throw error;
+    }
+  }
+
   async saveToGoogleSheet() {
     try {
+      // Load credentials
       const credentials = JSON.parse(
         await fs.readFile(CREDENTIALS_PATH, "utf8"),
       );
 
+      // Authenticate
       const auth = new google.auth.GoogleAuth({
         credentials,
         scopes: ["https://www.googleapis.com/auth/spreadsheets"],
@@ -195,29 +232,34 @@ class CreatorHooksScraperLight {
 
       const sheets = google.sheets({ version: "v4", auth });
 
+      const SHEET_NAME = "CreatorHooksData";
+      await this.ensureSheetExists(sheets, SHEET_NAME);
+
+      // Prepare data for sheets
       const headers = [
         "Post URL",
-        "Section Title",
+        "Title",
         "Framework",
         "Hook Score",
         "Why This Works",
       ];
       const rows = this.allHooks.map((hook) => [
         hook.postUrl,
-        hook.sectionTitle,
+        hook.title,
         hook.framework,
         hook.hookScore,
         hook.whyThisWorks,
       ]);
 
+      // Clear existing data and write new data
       await sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
-        range: "NewsletterSubscribers!A:E",
+        range: `'${SHEET_NAME}'!A:E`,
       });
 
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: "NewsletterSubscribers!A1",
+        range: `'${SHEET_NAME}'!A1`,
         valueInputOption: "RAW",
         resource: {
           values: [headers, ...rows],
@@ -227,6 +269,9 @@ class CreatorHooksScraperLight {
       console.log(
         `\n✓ Successfully saved ${rows.length} hooks to Google Sheet!`,
       );
+
+      // Also save to CSV
+      await this.saveToCSV();
     } catch (error) {
       console.error("Error saving to Google Sheet:", error.message);
       await this.saveToCSV();
@@ -234,17 +279,16 @@ class CreatorHooksScraperLight {
   }
 
   async saveToCSV() {
-    const headers =
-      "Post URL,Section Title,Framework,Hook Score,Why This Works\n";
+    const headers = "Post URL,Title,Framework,Hook Score,Why This Works\n";
     const rows = this.allHooks
       .map(
         (hook) =>
-          `"${hook.postUrl}","${hook.sectionTitle}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks.replace(/"/g, '""')}"`,
+          `"${hook.postUrl}","${hook.title}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks.replace(/"/g, '""')}"`,
       )
       .join("\n");
 
-    await fs.writeFile("creator-hooks-data.csv", headers + rows);
-    console.log("\n✓ Saved data to creator-hooks-data.csv");
+    await fs.writeFile("creator-hooks-data-v2.csv", headers + rows);
+    console.log("\n✓ Saved data to creator-hooks-data-v2.csv");
   }
 
   delay(ms) {
