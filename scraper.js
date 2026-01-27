@@ -263,15 +263,8 @@ class CreatorHooksScraper {
       await this.ensureSheetExists(sheets, SHEET_NAME);
 
       // Prepare data for sheets
-      const headers = [
-        "Post URL",
-        "Title",
-        "Framework",
-        "Hook Score",
-        "Why This Works",
-      ];
+      const headers = ["Title", "Framework", "Hook Score", "Why"];
       const rows = this.allHooks.map((hook) => [
-        hook.postUrl,
         hook.title,
         hook.framework,
         hook.hookScore,
@@ -281,7 +274,7 @@ class CreatorHooksScraper {
       // Clear existing data and write new data
       await sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
-        range: `'${SHEET_NAME}'!A:E`,
+        range: `'${SHEET_NAME}'!A:D`,
       });
 
       await sheets.spreadsheets.values.update({
@@ -307,11 +300,11 @@ class CreatorHooksScraper {
   }
 
   async saveToCSV() {
-    const headers = "Post URL,Title,Framework,Hook Score,Why This Works\n";
+    const headers = "Title,Framework,Hook Score,Why\n";
     const rows = this.allHooks
       .map(
         (hook) =>
-          `"${hook.postUrl}","${hook.title}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks}"`,
+          `"${hook.title}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks}"`,
       )
       .join("\n");
 
