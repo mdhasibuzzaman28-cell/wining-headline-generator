@@ -289,6 +289,9 @@ class CreatorHooksScraper {
       console.log(
         `\n✓ Successfully saved ${rows.length} hooks to Google Sheet!`,
       );
+      console.log(
+        `View your sheet here: https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`,
+      );
 
       // Also save to CSV
       await this.saveToCSV();
@@ -300,16 +303,29 @@ class CreatorHooksScraper {
   }
 
   async saveToCSV() {
-    const headers = "Title,Framework,Hook Score,Why\n";
-    const rows = this.allHooks
-      .map(
-        (hook) =>
-          `"${hook.title}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks}"`,
-      )
-      .join("\n");
+    try {
+      const headers = "Title,Framework,Hook Score,Why\n";
+      const rows = this.allHooks
+        .map(
+          (hook) =>
+            `"${hook.title}","${hook.framework}","${hook.hookScore}","${hook.whyThisWorks}"`,
+        )
+        .join("\n");
 
-    await fs.writeFile("creator-hooks-data-v2.csv", headers + rows);
-    console.log("\n✓ Saved data to creator-hooks-data-v2.csv");
+      await fs.writeFile("creator-hooks-data-v2.csv", headers + rows);
+      console.log("\n✓ Saved data to creator-hooks-data-v2.csv");
+    } catch (error) {
+      if (error.code === "EBUSY") {
+        console.warn(
+          "\n⚠️  Warning: Could not save CSV file because it is open in another program.",
+        );
+        console.warn(
+          "Please close 'creator-hooks-data-v2.csv' and try again if you need the CSV output.",
+        );
+      } else {
+        console.error("\n❌ Error saving CSV:", error.message);
+      }
+    }
   }
 
   delay(ms) {
